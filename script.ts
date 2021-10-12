@@ -16,8 +16,17 @@ class GameDisplay{
 		"rgb(175,227,141)",
 		"rgb( 66,135, 33)",
 	];
+    private currColor = 0;
     private canvas:Canvas;
     private showGrid:boolean;
+
+    private lastMouseX = -1;
+    private lastMouseY = -1;
+    private mouseX = 0;
+    private mouseY = 0;
+
+    private triangleData:number[][] = new Array(this.SIZE).fill([]).map(i=>new Array(this.SIZE * 2).fill(0));
+    private edgeData:boolean[][] = new Array(this.SIZE).fill([]).map(i=>new Array(this.SIZE * 3).fill(0));
 
     constructor(){
         this.canvas = new Canvas(0, 0, document.body);
@@ -31,76 +40,73 @@ class GameDisplay{
     }
 
     public paint(currTime:number,elapsedTime:number):void {
+        const {scale,canvas,edgeData,triangleData,fillTriAt,drawEdge} = this;
+
         const blinking = ((~~(currTime * 15)) & 3) != 0 && this.showGrid;
 
         if(this.showGrid){
-            this.canvas.setStrokeColor("rgb(200,200,200)");
+            canvas.setStrokeColor("rgb(200,200,200)");
             for(let i = 0; i <= this.SIZE; i++){
-                this.canvas.line(~~(i * this.scale * SQRT_3_2), 0, ~~(i * this.scale * SQRT_3_2), ~~(this.SIZE * this.scale));
+                canvas.line(~~(i * scale * SQRT_3_2), 0, ~~(i * scale * SQRT_3_2), ~~(this.SIZE * scale));
             }
             for(let i = 0; i <= this.SIZE * 3 / 2; i++){
-                this.canvas.line(0, ~~(i * this.scale), ~~(this.SIZE * this.scale * SQRT_3_2), ~~((i - this.SIZE / 2) * this.scale));
-                this.canvas.line(0, ~~((i - this.SIZE / 2) * this.scale), ~~(this.SIZE * this.scale * SQRT_3_2), ~~(i * this.scale));
+                canvas.line(0, ~~(i * scale), ~~(this.SIZE * scale * SQRT_3_2), ~~((i - this.SIZE / 2) * scale));
+                canvas.line(0, ~~((i - this.SIZE / 2) * scale), ~~(this.SIZE * scale * SQRT_3_2), ~~(i * scale));
             }
-            this.canvas.setFillColor("#FFF");
-            this.canvas.fillRect(0,~~(this.SIZE * this.scale),~~(this.SIZE * this.scale * SQRT_3_2),~~(this.SIZE / 2 * this.scale));
-            for(let i = 0; i < this.SIZE; i += 2) this.canvas.fillPolygon([0,0],[
-                [~~((i) * this.scale * SQRT_3_2) + 1, ~~((this.SIZE - 1) * this.scale) + 1],
-                [~~((i) * this.scale * SQRT_3_2) + 1, ~~(this.SIZE * this.scale) + 1],
-                [~~((i + 2) * this.scale * SQRT_3_2) - 1,~~(this.SIZE * this.scale) + 1],
+            canvas.setFillColor("#FFF");
+            canvas.fillRect(0,~~(this.SIZE * scale),~~(this.SIZE * scale * SQRT_3_2),~~(this.SIZE / 2 * scale));
+            for(let i = 0; i < this.SIZE; i += 2) canvas.fillPolygon([0,0],[
+                [~~((i) * scale * SQRT_3_2) + 1, ~~((this.SIZE - 1) * scale) + 1],
+                [~~((i) * scale * SQRT_3_2) + 1, ~~(this.SIZE * scale) + 1],
+                [~~((i + 2) * scale * SQRT_3_2) - 1,~~(this.SIZE * scale) + 1],
             ]);
         }
 
-        // //Draw filled triangles (or triangle outlines)
-        // for(let i = 0; i < this.SIZE; i++){
-        //     let x1 = ~~((i - 1.) * scale), x2 = ~~((i - .5) * scale),
-        //         x3 = ~~((i + 0.) * scale), x4 = ~~((i + .5) * scale),
-        //         x5 = ~~((i + 1.) * scale);
-        //     for(let j = 0; j < this.SIZE * 2; j++){
-        //         let y1 = ~~((j / 2) * scale * SQRT_3_2), y2 = ~~((j / 2 + 1) * scale * SQRT_3_2);
+        //Draw filled triangles (or triangle outlines)
+        for(let i = 0; i < this.SIZE; i++){
+            let x1 = ~~((i - 1.) * scale), x2 = ~~((i - .5) * scale),
+                x3 = ~~((i + 0.) * scale), x4 = ~~((i + .5) * scale),
+                x5 = ~~((i + 1.) * scale);
+            for(let j = 0; j < this.SIZE * 2; j++){
+                let y1 = ~~((j / 2) * scale * SQRT_3_2), y2 = ~~((j / 2 + 1) * scale * SQRT_3_2);
 
-        //         if(i == mouseX && j == mouseY && blinking){ //cell is hovered over
-        //             if(blinking && currState != States.ERASING){
-        //                 g.setColor(COLORS[this.currColor]);
-        //                 fillTriAt(g,x1,x2,x3,x4,x5,y1,y2,j);
-        //             }
-        //         }
-        //         else if(triangleData[i][j] > 0){   //cell has color
-        //             g.setColor(COLORS[triangleData[i][j] - 1]);
-        //             fillTriAt(g,x1,x2,x3,x4,x5,y1,y2,j);
-        //         }
-        //     }
-        // }
+                if(i == this.mouseX && j == this.mouseY && blinking){ //cell is hovered over
+                    if(blinking && this.currState != STATES.ERASING){
+                        canvas.setFillColor(this.COLORS[this.currColor]);
+                        this.fillTriAt(x1,x2,x3,x4,x5,y1,y2,j);
+                    }
+                }
+                else if(this.triangleData[i][j] > 0){   //cell has color
+                    canvas.setFillColor(this.COLORS[this.triangleData[i][j] - 1]);
+                    this.fillTriAt(x1,x2,x3,x4,x5,y1,y2,j);
+                }
+            }
+        }
 
-        // //Draw edges
-        // g.setColor(Color.BLACK);
-        // for(let i = 0; i < this.SIZE; i++){
-        //     let x1 = ~~((i - 1.) * scale), x2 = ~~((i - .5) * scale),
-        //         x3 = ~~((i + 0.) * scale), x4 = ~~((i + .5) * scale);
-        //     for(let j = 0; j < this.SIZE * 3; j++){
-        //         let y1 = ~~((j / 3) * scale * SQRT_3_2), y2 = ~~((j / 3 + 1) * scale * SQRT_3_2);
-        //         if(edgeData[i][j]) drawEdge(g,x1,x2,x3,x4,y1,y2,j);
-        //     }
-        // }
+        //Draw edges
+        canvas.setStrokeColor("#000");
+        for(let i = 0; i < this.SIZE; i++){
+            let x1 = ~~((i - 1.) * scale), x2 = ~~((i - .5) * scale),
+                x3 = ~~((i + 0.) * scale), x4 = ~~((i + .5) * scale);
+            for(let j = 0; j < this.SIZE * 3; j++){
+                let y1 = ~~((j / 3) * scale * SQRT_3_2), y2 = ~~((j / 3 + 1) * scale * SQRT_3_2);
+                if(edgeData[i][j]) drawEdge(x1,x2,x3,x4,y1,y2,j);
+            }
+        }
     }
 
-    // private void fillTriAt(Graphics2D g, x1:number, let x2, let x3, let x4, let x5, let y1, let y2, let j){
-    //     switch(j & 3){
-    //         case 0:
-    //             g.fillPolygon(new let[]{y1,y2,y1}, new let[]{x1,x2,x3}, 3);
-    //             break;
-    //         case 1:
-    //             g.fillPolygon(new let[]{y2,y1,y2}, new let[]{x2,x3,x4}, 3);
-    //             break;
-    //         case 2:
-    //             g.fillPolygon(new let[]{y1,y2,y1}, new let[]{x2,x3,x4}, 3);
-    //             break;
-    //         case 3:
-    //             g.fillPolygon(new let[]{y2,y1,y2}, new let[]{x3,x4,x5}, 3);
-    //             break;
-    //         default: break;
-    //     }
-    // }
+    private fillTriAt(x1:number, x2:number, x3:number, x4:number, x5:number, y1:number, y2:number, j:number):void{
+        switch(j & 3){
+            case 0:
+                this.canvas.fillPolygon([0,0],[[y1,x1],[y2,x2],[y1,x3]]); break;
+            case 1:
+                this.canvas.fillPolygon([0,0],[[y2,x2],[y1,x3],[y2,x4]]); break;
+            case 2:
+                this.canvas.fillPolygon([0,0],[[y1,x2],[y2,x3],[y1,x4]]); break;
+            case 3:
+                this.canvas.fillPolygon([0,0],[[y2,x3],[y1,x4],[y2,x5]]); break;
+        }
+    }
 
     // public static class Edge{
     //     public let x1,y1,x2,y2,ex,ey;
@@ -140,29 +146,24 @@ class GameDisplay{
     //         default: return new Edge[]{};
     //     }
     // }
-    // public void drawEdge(Graphics2D g, let x1, let x2, let x3, let x4, let y1, let y2, let j){
-    //     switch(j % 6){
-    //         case 0:
-    //             g.drawLine(y1,x1,y1,x3);
-    //             break;
-    //         case 1:
-    //             g.drawLine(y1,x1,y2,x2);
-    //             break;
-    //         case 2:
-    //             g.drawLine(y2,x2,y1,x3);
-    //             break;
-    //         case 3:
-    //             g.drawLine(y1,x2,y1,x4);
-    //             break;
-    //         case 4:
-    //             g.drawLine(y1,x2,y2,x3);
-    //             break;
-    //         case 5:
-    //             g.drawLine(y2,x3,y1,x4);
-    //             break;
-    //         default: break;
-    //     }
-    // }
+
+    public drawEdge(x1:number, x2:number, x3:number, x4:number, y1:number, y2:number, j:number):void{
+        switch(j % 6){
+            case 0:
+                this.canvas.line(y1,x1,y1,x3); break;
+            case 1:
+                this.canvas.line(y1,x1,y2,x2); break;
+            case 2:
+                this.canvas.line(y2,x2,y1,x3); break;
+            case 3:
+                this.canvas.line(y1,x2,y1,x4); break;
+            case 4:
+                this.canvas.line(y1,x2,y2,x3); break;
+            case 5:
+                this.canvas.line(y2,x3,y1,x4); break;
+            default: break;
+        }
+    }
 
     // //#region MouseObserver interface implementations
 
