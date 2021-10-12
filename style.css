@@ -1,0 +1,27 @@
+body{overflow:hidden}
+
+canvas{
+	position:absolute;top:0;left:0;z-index:0;
+}
+div#game-result{
+	/* display:none; */
+	position:absolute;top:0;left:0;z-index:1;
+
+	width:100vw;height:100vw;
+
+	color:white;
+	font-family:monospace;
+	font-size: min(5vh,5vw);
+	text-align:center;
+	
+}
+
+div#game-result[data-result="null"]{display:none;}
+
+div#game-result[data-result="win" ]{background-color:#8F88;}
+div#game-result[data-result="lose"]{background-color:#F888;}
+div#game-result[data-result="draw"]{background-color:#8888;}
+
+div#game-result[data-result="win" ]::after{content:"YOU WIN";}
+div#game-result[data-result="lose"]::after{content:"YOU LOSE";}
+div#game-result[data-result="draw"]::after{content:"DRAW";}
