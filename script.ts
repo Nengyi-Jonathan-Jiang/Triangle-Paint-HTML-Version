@@ -1,18 +1,28 @@
-class Pair<T1,T2>{public first:T1; public second:T2; constructor(first:T1,second:T2){this.first = first; this.second = second}}
+const SQRT_3_2 = 0.86602540378;
 
+enum STATES{IDLE, DRAWING, ERASING, DRAW_BLENDED_EDGE};
 class GameDisplay{
-	
-    private logic:GameLogic;
-    private SIZE = 800;
-    private LEFT_OFFSET = 0;
-    private TOP_OFFSET = 0;
-
+    private currState:STATES = STATES.IDLE;
+    private SIZE = 64;
+ 	private COLORS:string[] = [
+		"rgb( 30, 30, 30)",
+		"rgb(130,130,130)",
+		"rgb(230,230,230)",
+		"rgb( 25, 60,100)",
+		"rgb(100,130,170)",
+		"rgb( 90,  0,  0)",
+		"rgb(222,127,127)",
+		"rgb(175,227,141)",
+		"rgb( 66,135, 33)",
+	];
     private canvas:Canvas;
 
     constructor(){
-        this.logic = new GameLogic(this);
         this.canvas = new Canvas(0, 0, document.body);
-        this.canvas.canvas.addEventListener("click",(e:MouseEvent)=>this.onMouseDown(e.clientX,e.clientY));
+        this.canvas.canvas.addEventListener("mouseDown",(e:MouseEvent)=>this.onMouseDown(e.clientX,e.clientY));
+		this.canvas.canvas.addEventListener("mouseDown",(e:MouseEvent)=>this.onMouseUp(e.clientX,e.clientY));
+		this.canvas.canvas.addEventListener("mouseDown",(e:MouseEvent)=>this.onMouseDown(e.clientX,e.clientY));
+		this.canvas.canvas.addEventListener("mouseMove",(e:MouseEvent)=>this.onMouseMove(e.clientX,e.clientY));
         window.addEventListener("keypress",(e:KeyboardEvent)=>this.onKeyPressed(e.keyCode));
         window.addEventListener("resize",_=>this.canvas.resizeToWindow());
         Canvas.createAnimation(_=>this.paint());
