@@ -1,5 +1,17 @@
 const SQRT_3_2 = 0.86602540378;
 
+class Edge{
+    public x1:number;
+    public y1:number;
+    public x2:number;
+    public y2:number;
+    public ex:number;
+    public ey:number;
+    constructor(x1:number, y1:number,x2:number, y2:number, ex:number, ey:number){
+        this.x1 = x1; this.x2 = x2; this.y1 = y1; this.y2 = y2; this.ex = ex; this.ey = ey;
+    }
+}
+
 enum STATES{IDLE, DRAWING, ERASING, DRAW_BLENDED_EDGE};
 class GameDisplay{
     private currState:STATES = STATES.IDLE;
@@ -30,9 +42,9 @@ class GameDisplay{
 
     constructor(){
         this.canvas = new Canvas(0, 0, document.body);
-        this.canvas.canvas.addEventListener("mousedown",(e:MouseEvent)=>this.onMouseDown(e.clientX,e.clientY))
+        this.canvas.canvas.addEventListener("mousedown",(e:MouseEvent)=>this.onMouseDown(e.clientX,e.clientY,e.button,e.ctrlKey))
 		this.canvas.canvas.addEventListener("mouseup"  ,(e:MouseEvent)=>this.onMouseUp(e.clientX,e.clientY));
-		this.canvas.canvas.addEventListener("mousemove",(e:MouseEvent)=>this.onMouseDown(e.clientX,e.clientY));
+		this.canvas.canvas.addEventListener("mousemove",(e:MouseEvent)=>this.onMouseMove(e.clientX,e.clientY,e.ctrlKey));
 		this.canvas.canvas.addEventListener("wheel"    ,(e:WheelEvent)=>this.onMouseWheel(e.deltaY));
         window.addEventListener("keypress",(e:KeyboardEvent)=>this.onKeyPressed(e.keyCode));
         window.addEventListener("resize",_=>this.canvas.resizeToWindow());
@@ -40,55 +52,55 @@ class GameDisplay{
     }
 
     public paint(currTime:number,elapsedTime:number):void {
-        const {scale,canvas,edgeData,triangleData,fillTriAt,drawEdge} = this;
+        const {COLORS,SIZE,showGrid,scale,canvas,edgeData,triangleData,mouseX,mouseY,currState,currColor,fillTriAt,drawEdge} = this;
 
         const blinking = ((~~(currTime * 15)) & 3) != 0 && this.showGrid;
 
-        if(this.showGrid){
+        if(showGrid){
             canvas.setStrokeColor("rgb(200,200,200)");
-            for(let i = 0; i <= this.SIZE; i++){
-                canvas.line(~~(i * scale * SQRT_3_2), 0, ~~(i * scale * SQRT_3_2), ~~(this.SIZE * scale));
+            for(let i = 0; i <= SIZE; i++){
+                canvas.line(~~(i * scale * SQRT_3_2), 0, ~~(i * scale * SQRT_3_2), ~~(SIZE * scale));
             }
-            for(let i = 0; i <= this.SIZE * 3 / 2; i++){
-                canvas.line(0, ~~(i * scale), ~~(this.SIZE * scale * SQRT_3_2), ~~((i - this.SIZE / 2) * scale));
-                canvas.line(0, ~~((i - this.SIZE / 2) * scale), ~~(this.SIZE * scale * SQRT_3_2), ~~(i * scale));
+            for(let i = 0; i <= SIZE * 3 / 2; i++){
+                canvas.line(0, ~~(i * scale), ~~(SIZE * scale * SQRT_3_2), ~~((i - SIZE / 2) * scale));
+                canvas.line(0, ~~((i - SIZE / 2) * scale), ~~(SIZE * scale * SQRT_3_2), ~~(i * scale));
             }
             canvas.setFillColor("#FFF");
-            canvas.fillRect(0,~~(this.SIZE * scale),~~(this.SIZE * scale * SQRT_3_2),~~(this.SIZE / 2 * scale));
-            for(let i = 0; i < this.SIZE; i += 2) canvas.fillPolygon([0,0],[
-                [~~((i) * scale * SQRT_3_2) + 1, ~~((this.SIZE - 1) * scale) + 1],
-                [~~((i) * scale * SQRT_3_2) + 1, ~~(this.SIZE * scale) + 1],
-                [~~((i + 2) * scale * SQRT_3_2) - 1,~~(this.SIZE * scale) + 1],
+            canvas.fillRect(0,~~(SIZE * scale),~~(SIZE * scale * SQRT_3_2),~~(SIZE / 2 * scale));
+            for(let i = 0; i < SIZE; i += 2) canvas.fillPolygon([0,0],[
+                [~~((i) * scale * SQRT_3_2) + 1, ~~((SIZE - 1) * scale) + 1],
+                [~~((i) * scale * SQRT_3_2) + 1, ~~(SIZE * scale) + 1],
+                [~~((i + 2) * scale * SQRT_3_2) - 1,~~(SIZE * scale) + 1],
             ]);
         }
 
         //Draw filled triangles (or triangle outlines)
-        for(let i = 0; i < this.SIZE; i++){
+        for(let i = 0; i < SIZE; i++){
             let x1 = ~~((i - 1.) * scale), x2 = ~~((i - .5) * scale),
                 x3 = ~~((i + 0.) * scale), x4 = ~~((i + .5) * scale),
                 x5 = ~~((i + 1.) * scale);
-            for(let j = 0; j < this.SIZE * 2; j++){
-                let y1 = ~~((j / 2) * scale * SQRT_3_2), y2 = ~~((j / 2 + 1) * scale * SQRT_3_2);
+            for(let j = 0; j < SIZE * 2; j++){
+                let y1 = ~~((j >> 1) * scale * SQRT_3_2), y2 = ~~(((j >> 1) + 1) * scale * SQRT_3_2);
 
-                if(i == this.mouseX && j == this.mouseY && blinking){ //cell is hovered over
-                    if(blinking && this.currState != STATES.ERASING){
-                        canvas.setFillColor(this.COLORS[this.currColor]);
-                        this.fillTriAt(x1,x2,x3,x4,x5,y1,y2,j);
+                if(i == mouseX && j == mouseY && blinking){ //cell is hovered over
+                    if(blinking && currState != STATES.ERASING){
+                        canvas.setFillColor(COLORS[currColor]);
+                        fillTriAt(x1,x2,x3,x4,x5,y1,y2,j);
                     }
                 }
-                else if(this.triangleData[i][j] > 0){   //cell has color
-                    canvas.setFillColor(this.COLORS[this.triangleData[i][j] - 1]);
-                    this.fillTriAt(x1,x2,x3,x4,x5,y1,y2,j);
+                else if(triangleData[i][j] > 0){   //cell has color
+                    canvas.setFillColor(COLORS[triangleData[i][j] - 1]);
+                    fillTriAt(x1,x2,x3,x4,x5,y1,y2,j);
                 }
             }
         }
 
         //Draw edges
         canvas.setStrokeColor("#000");
-        for(let i = 0; i < this.SIZE; i++){
+        for(let i = 0; i < SIZE; i++){
             let x1 = ~~((i - 1.) * scale), x2 = ~~((i - .5) * scale),
                 x3 = ~~((i + 0.) * scale), x4 = ~~((i + .5) * scale);
-            for(let j = 0; j < this.SIZE * 3; j++){
+            for(let j = 0; j < SIZE * 3; j++){
                 let y1 = ~~((j / 3) * scale * SQRT_3_2), y2 = ~~((j / 3 + 1) * scale * SQRT_3_2);
                 if(edgeData[i][j]) drawEdge(x1,x2,x3,x4,y1,y2,j);
             }
@@ -107,45 +119,36 @@ class GameDisplay{
                 this.canvas.fillPolygon([0,0],[[y2,x3],[y1,x4],[y2,x5]]); break;
         }
     }
-
-    // public static class Edge{
-    //     public let x1,y1,x2,y2,ex,ey;
-    //     public Edge(let x1,let y1,let x2,let y2,let ex,let ey){
-    //         this.x1 = x1; this.x2 = x2;
-    //         this.y1 = y1; this.y2 = y2;
-    //         this.ex = ex; this.ey = ey;
-    //     }
-    // }
-    // public Edge[] getAdjacentEdges(let x, let y){
-    //     let y_ = (y >> 2) * 6;
-    //     switch(y & 3){
-    //         case 0:
-    //             return new Edge[]{
-    //                 new Edge(x,y,x - 1, y + 1, x + 0, y_ + 1),
-    //                 new Edge(x,y,x - 1, y - 1, x + 0, y_ + 0),
-    //                 new Edge(x,y,x + 0, y + 1, x + 0, y_ + 2),
-    //             };
-    //         case 1:
-    //             return new Edge[]{
-    //                 new Edge(x,y,x + 0, y + 1, x + 0, y_ + 3),
-    //                 new Edge(x,y,x + 0, y - 1, x + 0, y_ + 2),
-    //                 new Edge(x,y,x + 1, y - 1, x + 1, y_ + 1),
-    //             };
-    //         case 2:
-    //             return new Edge[]{
-    //                 new Edge(x,y,x + 0, y - 1, x + 0, y_ + 3),
-    //                 new Edge(x,y,x - 1, y + 1, x + 0, y_ + 4),
-    //                 new Edge(x,y,x + 0, y + 1, x + 0, y_ + 5),
-    //             };
-    //         case 3:
-    //             return new Edge[]{
-    //                 new Edge(x,y,x + 1, y - 1, x + 1, y_ + 4),
-    //                 new Edge(x,y,x + 0, y - 1, x + 0, y_ + 5),
-    //                 new Edge(x,y,x + 1, y + 1, x + 1, y_ + 6),
-    //             };
-    //         default: return new Edge[]{};
-    //     }
-    // }
+    public getAdjacentEdges(x:number, y:number):Edge[]{
+        let y_ = (y >> 2) * 6;
+        switch(y & 3){
+            case 0:
+                return [
+                    new Edge(x,y,x - 1, y + 1, x + 0, y_ + 1),
+                    new Edge(x,y,x - 1, y - 1, x + 0, y_ + 0),
+                    new Edge(x,y,x + 0, y + 1, x + 0, y_ + 2),
+                ];
+            case 1:
+                return [
+                    new Edge(x,y,x + 0, y + 1, x + 0, y_ + 3),
+                    new Edge(x,y,x + 0, y - 1, x + 0, y_ + 2),
+                    new Edge(x,y,x + 1, y - 1, x + 1, y_ + 1),
+                ];
+            case 2:
+                return [
+                    new Edge(x,y,x + 0, y - 1, x + 0, y_ + 3),
+                    new Edge(x,y,x - 1, y + 1, x + 0, y_ + 4),
+                    new Edge(x,y,x + 0, y + 1, x + 0, y_ + 5),
+                ];
+            case 3:
+                return [
+                    new Edge(x,y,x + 1, y - 1, x + 1, y_ + 4),
+                    new Edge(x,y,x + 0, y - 1, x + 0, y_ + 5),
+                    new Edge(x,y,x + 1, y + 1, x + 1, y_ + 6),
+                ];
+            default: return [];
+        }
+    }
 
     public drawEdge(x1:number, x2:number, x3:number, x4:number, y1:number, y2:number, j:number):void{
         switch(j % 6){
@@ -165,193 +168,94 @@ class GameDisplay{
         }
     }
 
-    // //#region MouseObserver interface implementations
+    private drawBlendedEdge(){
+        const {mouseX,mouseY,currColor} = this;
+        this.triangleData[mouseX][mouseY] = currColor + 1;
+        for(let e of this.getAdjacentEdges(mouseX, mouseY)){
+            this.edgeData[e.ex][e.ey] = this.triangleData[e.x2][e.y2] != currColor + 1;
+        }
+    }
+    private drawNormal(){
+        const {lastMouseX,lastMouseY,mouseX,mouseY,currColor} = this;
+        this.triangleData[mouseX][mouseY] = currColor + 1;
+        if(mouseX != lastMouseX || mouseY != lastMouseY){
+            for(let e of this.getAdjacentEdges(mouseX, mouseY)){
+                this.edgeData[e.ex][e.ey] = e.x2 != lastMouseX || e.y2 != lastMouseY;
+            }
+        }
+    }
 
-    // @Override
-    // public void onMouseMove(let x, let y) {
-    //     lastMouseX = mouseX;
-    //     lastMouseY = mouseY;
-
-    //     double Y = x / scale / SQRT_3_2, X = y / scale - 0.5 * (Y % 2) + 1;
-    //     mouseX = ~~X;
-    //     mouseY = 2 * ~~Y + ((X % 1.0) + (Y % 1.0) >= 1 ? 1 : 0);
-
-    //     switch(currState){
-    //         case IDLE: break;
-    //         case DRAW_BLENDED_EDGE:
-    //             drawBlendedEdge();
-    //             if(!keys.isKeyPressed(KeyEvent.VK_CONTROL)) currState = States.DRAWING;
-    //             break;
-    //         case DRAWING:
-    //             drawNormal();
-    //             if(keys.isKeyPressed(KeyEvent.VK_CONTROL)) currState = States.DRAW_BLENDED_EDGE;
-    //             break;
-    //         case ERASING:
-    //             erase();
-    //             break;
-    //     }
-    // }
-
-    // //#region drawing functions
-    // private void drawBlendedEdge(){
-    //     triangleData[mouseX][mouseY] = currColor + 1;
-    //     for(Edge e : getAdjacentEdges(mouseX, mouseY)){
-    //         edgeData[e.ex][e.ey] = triangleData[e.x2][e.y2] != currColor + 1;
-    //     }
-    // }
-    // private void drawNormal(){
-    //     triangleData[mouseX][mouseY] = currColor + 1;
-    //     if(mouseX != lastMouseX || mouseY != lastMouseY){
-    //         for(Edge e : getAdjacentEdges(mouseX, mouseY)){
-    //             edgeData[e.ex][e.ey] = e.x2 != lastMouseX || e.y2 != lastMouseY;
-    //         }
-    //     }
-    // }
-
-    // private void erase(){
-    //     triangleData[mouseX][mouseY] = 0;
-    //     for(Edge e : getAdjacentEdges(mouseX, mouseY)){
-    //         edgeData[e.ex][e.ey] = triangleData[e.x1][e.y1] + triangleData[e.x2][e.y2] != 0;
-    //     }
-    // }
-    // //#endregion
-
-    // @Override
-    // public void onMouseWheel(let wheelRotation) {
-    //     scale *= 1. - .01 * wheelRotation;
-    // }
-
-    // @Override
-    // public void onMouseClick(let x, let y, MyMouseListener.Button b) {}
-
-    // @Override
-    // public void onMouseDown(let x, let y, MyMouseListener.Button b) {
-    //     switch(b){
-    //         case LEFT_CLICK:
-    //             currState = States.DRAW_BLENDED_EDGE;
-    //             onMouseMove(x,y);
-    //             break;
-    //         case MIDDLE_CLICK: break;
-    //         case RIGHT_CLICK:
-    //             currState = States.ERASING;
-    //             onMouseMove(x,y);
-    //             break;
-    //         case NO_CLICK: break;
-    //     }
-    // }
-    
-    // @Override
-    // public void onMouseUp(let x, let y, MyMouseListener.Button b) {
-    //     currState = States.IDLE;
-    //     lastMouseX = lastMouseY = -1;
-    // }
-
-    // //#endregion
-
-    // //#region KeyObserver interface implementations
-
-    // @Override
-    // public void onKeyPressed(let keyCode) {
-    //     switch(keyCode){
-    //         case KeyEvent.VK_EQUALS:
-    //             scale *= 1.01;
-    //             break;
-    //         case KeyEvent.VK_MINUS:
-    //             scale *= 0.99;
-    //             break;
-    //         case KeyEvent.VK_1:
-    //             currColor = 0; break;
-    //         case KeyEvent.VK_2:
-    //             currColor = 1; break;
-    //         case KeyEvent.VK_3:
-    //             currColor = 2; break;
-    //         case KeyEvent.VK_4:
-    //             currColor = 3; break;
-    //         case KeyEvent.VK_5:
-    //             currColor = 4; break;
-    //         case KeyEvent.VK_6:
-    //             currColor = 5; break;
-    //         case KeyEvent.VK_7:
-    //             currColor = 6; break;
-    //         case KeyEvent.VK_8:
-    //             currColor = 7; break;
-    //         case KeyEvent.VK_9:
-    //             currColor = 8; break;
-            
-    //         case KeyEvent.VK_R:
-    //             for(boolean[] i : edgeData) for(let j = 0; j < i.length; j++) i[j] = false;
-    //             for(let[] i : triangleData) for(let j = 0; j < i.length; j++) i[j] = 0;
-    //             break;
-    //         case KeyEvent.VK_V:
-    //             showGrid = !showGrid; break;
-            
-    //         default:break;
-    //     }
-    // }
-
-    // @Override
-    // public void onKeyReleased(let keyCode){}
-    // @Override
-    // public void onKeyTyped(let keyCode){}
-
-
-
-
-
-
-
-
-    // //Called every time the display needs to update
-    // public paint():void{
-
-    //     //Recalculate dimensions
-    //     const WIDTH = this.canvas.width, HEIGHT = this.canvas.height;
-        
-    //     //Paint board background
-    //     this.canvas.clear("#EEE");
-    //     //this.canvas.setFillColor("rgb(200,200,200)");
-    //     //this.canvas.fillRect(LEFT_OFFSET, TOP_OFFSET, LEFT_OFFSET + this.SIZE, TOP_OFFSET + this.SIZE);
-
-    //     // this.canvas.setDrawColor("#000");
-
-    //     // //Draw grid
-    //     // for(let i = 0; i <= BOARD_SIZE; i++){
-    //     //     const offset =  i * this.SIZE / BOARD_SIZE;
-    //     //     this.canvas.line(LEFT_OFFSET, TOP_OFFSET + offset, WIDTH - LEFT_OFFSET, TOP_OFFSET + offset);
-    //     //     this.canvas.line(LEFT_OFFSET + offset, TOP_OFFSET, LEFT_OFFSET + offset, HEIGHT - TOP_OFFSET);
-    //     // }
-
-    //     // const PADDING = ~~(this.SIZE / BOARD_SIZE / 9);
-    //     // //Draw pieces
-    //     // for(let i = 0; i < GameLogic.BOARD_SIZE; i++){
-    //     //     for(let j = 0; j < GameLogic.BOARD_SIZE; j++){
-    //     //         const circleX = LEFT_OFFSET + i * this.SIZE / BOARD_SIZE;
-    //     //         const circleY = TOP_OFFSET  + j * this.SIZE / BOARD_SIZE;
-                
-    //     //         switch(this.logic.getPieceAt(i, j)){
-    //     //             case BOARD_CELL.PLAYER:
-    //     //                 this.canvas.circle(circleX + PIECE_RAD, circleY + PIECE_RAD, PIECE_RAD - PADDING);
-    //     //                 break;
-    //     //             case BOARD_CELL.OPPONENT:
-    //     //                 this.canvas.fillCircle(circleX + PIECE_RAD, circleY + PIECE_RAD, PIECE_RAD - PADDING);
-    //     //                 break;
-    //     //         }
-    //     //     }
-    //     // }
-    // }
+    private erase(){
+        const {mouseX,mouseY,currColor} = this;
+        this.triangleData[mouseX][mouseY] = 0;
+        for(let e of this.getAdjacentEdges(mouseX, mouseY)){
+            this.edgeData[e.ex][e.ey] = this.triangleData[e.x1][e.y1] + this.triangleData[e.x2][e.y2] != 0;
+        }
+    }
 
     public onKeyPressed(keyCode:number):void{
-        
+        switch(keyCode){
+            case 187:
+                this.scale *= 1.01;
+                break;
+            case 189:
+                this.scale *= 0.99;
+                break;
+            case 49: case 50: case 51:
+            case 52: case 53: case 54:
+            case 55: case 56: case 57:
+                this.currColor = keyCode - 49; break;
+            case 82:
+                for(let i : this.edgeData) for(let j = 0; j < i.length; j++) i[j] = false;
+                for(let i : this.triangleData) for(let j = 0; j < i.length; j++) i[j] = 0;
+                break;
+            case 86:
+                this.showGrid = !this.showGrid; break;
+            
+            default:break;
+        }
     }
 
-    public onMouseDown(x:number, y:number) {
-        
+    public onMouseDown(x:number, y:number, b:number, ctrlKey:boolean) {
+        switch(b){
+            case 0:
+                this.currState = STATES.DRAW_BLENDED_EDGE;
+                this.onMouseMove(x,y,ctrlKey);
+                break;
+            case 1: break;
+            case 2:
+                this.currState = STATES.ERASING;
+                this.onMouseMove(x,y,ctrlKey);
+                break;
+        }
     }
     public onMouseUp(x:number, y:number) {
-        
+        this.currState = STATES.IDLE;
+        this.lastMouseX = this.lastMouseY = -1;
     }
-    public onMouseMove(x:number, y:number) {
-        
+    public onMouseMove(x:number, y:number, ctrlKey:boolean) {
+
+        this.lastMouseX = this.mouseX;
+        this.lastMouseY = this.mouseY;
+
+        let Y = x / this.scale / SQRT_3_2, X = y / this.scale - 0.5 * (Y % 2) + 1;
+        this.mouseX = ~~X;
+        this.mouseY = 2 * ~~Y + ((X % 1) + (Y % 1) >= 1 ? 1 : 0);
+
+        switch(this.currState){
+            case STATES.IDLE: break;
+            case STATES.DRAW_BLENDED_EDGE:
+                this.drawBlendedEdge();
+                if(!ctrlKey) this.currState = STATES.DRAWING;
+                break;
+            case STATES.DRAWING:
+                this.drawNormal();
+                if(ctrlKey) this.currState = STATES.DRAW_BLENDED_EDGE;
+                break;
+            case STATES.ERASING:
+                this.erase();
+                break;
+        }
     }
     public onMouseWheel(d:number) {
         this.scale *= 1 - d * .0004;
