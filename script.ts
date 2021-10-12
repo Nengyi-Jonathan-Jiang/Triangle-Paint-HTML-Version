@@ -206,8 +206,8 @@ class GameDisplay{
             case 55: case 56: case 57:
                 this.currColor = keyCode - 49; break;
             case 82:
-                for(let i : this.edgeData) for(let j = 0; j < i.length; j++) i[j] = false;
-                for(let i : this.triangleData) for(let j = 0; j < i.length; j++) i[j] = 0;
+                //for(let i : this.edgeData) for(let j = 0; j < i.length; j++) i[j] = false;
+                //for(let i : this.triangleData) for(let j = 0; j < i.length; j++) i[j] = 0;
                 break;
             case 86:
                 this.showGrid = !this.showGrid; break;
