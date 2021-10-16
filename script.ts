@@ -1,5 +1,5 @@
 const SQRT_3_2 = 0.86602540378;
-
+ 
 class Edge{
     public x1:number;
     public y1:number;
